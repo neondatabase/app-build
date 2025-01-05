@@ -2,10 +2,15 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { MemorySaver } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
+import express from "express";
+
+const app = express();
+app.use(express.json());
 
 const agentModel = new ChatAnthropic({
-  apiKey: "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",
-  model: 'claude-3-5-sonnet-20241022',
+  apiKey:
+    "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",
+  model: "claude-3-5-sonnet-20241022",
   maxTokens: 8192,
 });
 
@@ -432,15 +437,16 @@ export default {
 
 // Example usage
 const agentResponse = await agent.invoke(
-  { messages: [
-    new SystemMessage(SYSTEM_PROMPT),
-    new HumanMessage("Please implement a todo list app")] },
+  {
+    messages: [
+      new SystemMessage(SYSTEM_PROMPT),
+      new HumanMessage("Please implement a todo list app"),
+    ],
+  },
   { configurable: { thread_id: "simple-test" } }
 );
 
-console.log(agentResponse.messages[agentResponse.messages.length - 1].content);
-
-
+// console.log(agentResponse.messages[agentResponse.messages.length - 1].content);
 
 // Example with follow-up question using the same thread
 // const followUpResponse = await agent.invoke(
@@ -451,3 +457,27 @@ console.log(agentResponse.messages[agentResponse.messages.length - 1].content);
 // console.log(
 //   followUpResponse.messages[followUpResponse.messages.length - 1].content
 // );
+
+app.post("/generate", async (req: any, res: any) => {
+  try {
+    const { prompt } = req.body;
+
+    const agentResponse = await agent.invoke(
+      {
+        messages: [new SystemMessage(SYSTEM_PROMPT), new HumanMessage(prompt)],
+      },
+      { configurable: { thread_id: "api-" + Date.now() } }
+    );
+
+    const result =
+      agentResponse.messages[agentResponse.messages.length - 1].content;
+    res.json({ result });
+  } catch (error: Error | any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
