@@ -440,6 +440,8 @@ const agentResponse = await agent.invoke(
 
 console.log(agentResponse.messages[agentResponse.messages.length - 1].content);
 
+
+
 // Example with follow-up question using the same thread
 // const followUpResponse = await agent.invoke(
 //   { messages: [new HumanMessage("And what is that number multiplied by 3?")] },

@@ -123,6 +123,21 @@ describe("parseXMLLikeTags", () => {
 
     expect(() => parseXMLLikeTags(input)).toThrowError();
   });
+  
+  it("parses tags in the middle of output that should be ignored", () => {
+    const input = "Hello world <a b=\"parse\">c</a> random";
+    const expected = [
+      {
+        tag: "a",
+        meta: {
+          b: "parse",
+        },
+        content: "c",
+      },
+    ]
+
+    expect(parseXMLLikeTags(input)).toEqual(expected);
+  });
 
   it("should error on tags with no closure", () => {
     const input = "<a>";
