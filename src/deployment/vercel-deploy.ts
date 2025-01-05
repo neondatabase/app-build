@@ -421,7 +421,6 @@ function parseXMLFileString(input: string): Array<InlinedFile> {
     return {
       file: fileName, // Relative path from the directory
       data: content,
-      encoding: Encoding.Base64,
     };
   }));
 }
@@ -458,7 +457,7 @@ function getFilesToUpload(directory: string): Array<InlinedFile> {
   });
 }
 
-export async function createAndCheckDeployment() {
+export async function createAndCheckDeployment({ input }: { input: string }) {
   try {
     // Create a new deployment
     const deployment = await vercel.deployments.createDeployment({
@@ -468,7 +467,7 @@ export async function createAndCheckDeployment() {
         // files: getFilesToUpload(
           // '/Users/david/src/nextjs-boilerplate'
         // ),
-        files: parseXMLFileString(FULL_PROJECT),
+        files: parseXMLFileString(input),
         projectSettings: {
           buildCommand: 'npm run build',
           framework: 'vite',
@@ -505,4 +504,4 @@ export async function createAndCheckDeploymentMock() {
   }
 }
 
-createAndCheckDeployment();
+createAndCheckDeployment({ input: FULL_PROJECT });
