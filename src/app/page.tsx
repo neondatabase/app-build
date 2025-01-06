@@ -70,10 +70,13 @@ export default function Home() {
         const deployment = await getDeployment(deploymentId);
 
         if (deployment.readyState === 'READY') {
-          setDeploymentUrl(`https://${deployment.alias?.[0]}`);
-          console.log('Deployment ready:', deployment);
-          setDeploymentId(null); // Clear ID once ready
-          setIsLoading(false);
+          // make sure the deployment is ready
+          setTimeout(() => {
+            setDeploymentUrl(`https://${deployment.alias?.[0]}`);
+            console.log('Deployment ready:', deployment);
+            setDeploymentId(null); // Clear ID once ready
+            setIsLoading(false);
+          }, 2_000);
         } else if (deployment.readyState === 'ERROR') {
           alert(deployment.errorMessage);
           console.error('Deployment failed:', deployment.errorMessage);
