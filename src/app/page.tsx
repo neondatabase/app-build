@@ -2,8 +2,11 @@
 
 import { parseAgentConfig } from '../agent/xml-parser';
 import { AppPreview } from '@/app/app-preview';
-import { createAndCheckDeployment } from '@/deployment/vercel-deploy';
-import { useState } from 'react';
+import {
+  createAndCheckDeployment,
+  getDeployment,
+} from '@/deployment/vercel-deploy';
+import { useState, useEffect } from 'react';
 
 const RECOMMENDED_PROMPTS = [
   {
@@ -27,12 +30,73 @@ const RECOMMENDED_PROMPTS = [
   },
 ];
 
+const LOADING_MESSAGES = [
+  '🤔 The AI is analyzing your prompt...',
+  '🔨 Designing the application architecture...',
+  '📝 Writing the code and components...',
+  '🎨 Adding styles and layout...',
+  '🚀 Preparing for deployment...',
+];
+
 export default function Home() {
   const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
   const [promptInput, setPromptInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const [deploymentId, setDeploymentId] = useState<string | null>(null);
 
   const isInputValid = promptInput.trim().length >= 10;
+
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingMessageIndex(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setLoadingMessageIndex((current) =>
+        current === LOADING_MESSAGES.length - 1 ? current : current + 1
+      );
+    }, 8_000);
+
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
+  useEffect(() => {
+    if (!deploymentId) return;
+
+    const pollDeployment = async () => {
+      try {
+        const deployment = await getDeployment(deploymentId);
+
+        if (deployment.readyState === 'READY') {
+          setDeploymentUrl(`https://${deployment.alias?.[0]}`);
+          console.log('Deployment ready:', deployment);
+          setDeploymentId(null); // Clear ID once ready
+          setIsLoading(false);
+        } else if (deployment.readyState === 'ERROR') {
+          alert(deployment.errorMessage);
+          console.error('Deployment failed:', deployment.errorMessage);
+          setDeploymentId(null);
+          setIsLoading(false);
+        } else {
+          // Continue polling if not ready
+          setTimeout(pollDeployment, 5_000);
+        }
+      } catch (error) {
+        console.error('Failed to check deployment status:', error);
+        setDeploymentId(null);
+        setIsLoading(false);
+      }
+    };
+
+    pollDeployment();
+
+    // Cleanup
+    return () => {
+      setDeploymentId(null);
+    };
+  }, [deploymentId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +104,8 @@ export default function Home() {
     if (!isInputValid || isLoading) return;
 
     setIsLoading(true);
+    setDeploymentUrl(null); // Clear previous URL
+
     try {
       const response = await fetch('/api/generate', {
         method: 'POST',
@@ -52,10 +118,14 @@ export default function Home() {
       const deployment = await createAndCheckDeployment({
         input: responseSections.project_files,
       });
-      setDeploymentUrl(deployment?.url || null);
+
+      if (deployment?.id) {
+        setDeploymentId(deployment.id);
+      } else {
+        throw new Error('No deployment ID received');
+      }
     } catch (error) {
       console.error('Failed to generate app:', error);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -118,22 +188,44 @@ export default function Home() {
                   </p>
                 )}
               </div>
-              <button
-                type="submit"
-                disabled={!isInputValid || isLoading}
-                className="inline-flex items-center justify-center h-10 px-6 font-medium text-white bg-[#2E2E2E] dark:bg-[#FAFAFA] dark:text-[#1A1A1A] rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed relative"
-              >
-                {isLoading ? (
-                  <>
-                    <span className="opacity-0">Generate App</span>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-5 h-5 border-2 border-white dark:border-black border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  </>
-                ) : (
-                  'Generate App'
+              <div className="flex items-center  space-y-2 gap-4">
+                <button
+                  type="submit"
+                  disabled={!isInputValid || isLoading}
+                  className="inline-flex items-center justify-center h-10 px-6 font-medium text-white bg-[#2E2E2E] dark:bg-[#FAFAFA] dark:text-[#1A1A1A] rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed relative min-w-[200px]"
+                >
+                  {isLoading ? (
+                    <>
+                      <span className="opacity-0">Generate App</span>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div
+                          className="w-5 h-5 border-[3px] border-white/25 dark:border-black/25 border-t-white dark:border-t-black rounded-full animate-spin"
+                          style={{
+                            animationDuration: '0.6s',
+                          }}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    'Generate App'
+                  )}
+                </button>
+
+                {isLoading && (
+                  <div className="flex justify-center">
+                    <span
+                      className="text-sm text-center text-[#666666] dark:text-[#888888]"
+                      style={{
+                        animation: 'fade-in 0.3s ease-out forwards',
+                        opacity: 0,
+                        transform: 'translateY(4px)',
+                      }}
+                    >
+                      {LOADING_MESSAGES[loadingMessageIndex]}
+                    </span>
+                  </div>
                 )}
-              </button>
+              </div>
             </form>
 
             <div className="space-y-3">
@@ -168,7 +260,9 @@ export default function Home() {
               <AppPreview url={deploymentUrl} />
             ) : (
               <div className="flex items-center justify-center h-64 text-[#666666] dark:text-[#888888] text-sm">
-                Your app preview will appear here
+                {isLoading
+                  ? 'Deploying your application...'
+                  : 'Your app preview will appear here'}
               </div>
             )}
           </div>

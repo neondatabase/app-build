@@ -24,12 +24,20 @@ export async function createAndCheckDeployment({ input }: { input: string }) {
       },
     });
 
+    console.dir(deployment, { depth: null });
     return deployment;
   } catch (error) {
     console.error(
       error instanceof Error ? `Error: ${error.message}` : String(error)
     );
   }
+}
+
+export async function getDeployment(id: string) {
+  const deployment = await vercel.deployments.getDeployment({
+    idOrUrl: id,
+  });
+  return deployment;
 }
 
 // createAndCheckDeployment({ input: FULL_PROJECT });
