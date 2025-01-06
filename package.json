@@ -10,6 +10,9 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@langchain/anthropic": "0.3.11",
+    "@langchain/core": "0.3.27",
+    "@langchain/langgraph": "0.2.39",
     "@types/fs-extra": "^11.0.4",
     "@vercel/sdk": "^1.2.1",
     "fs-extra": "^11.2.0",
