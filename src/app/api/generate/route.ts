@@ -8,8 +8,7 @@ import { SYSTEM_PROMPT } from '../../../../agent';
 export async function POST(request: NextRequest) {
   try {
     const agentModel = new ChatAnthropic({
-      apiKey:
-        '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',
+      apiKey: process.env.ANTHROPIC_API_KEY,
       model: 'claude-3-5-sonnet-20241022',
       maxTokens: 8192,
     });
