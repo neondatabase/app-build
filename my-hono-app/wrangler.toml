@@ -1,9 +1,7 @@
 name = "my-hono-app"
 main = "src/index.ts"
 compatibility_date = "2025-01-09"
-
-[vars]
-DATABASE_URL = ""
+vars = { }
 
 [observability]
 enabled = true

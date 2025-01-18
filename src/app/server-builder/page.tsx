@@ -1,5 +1,6 @@
 'use client';
 
+import { PromptToApiResponse } from '@/app/api/prompt-to-api/route';
 import { useState, useEffect } from 'react';
 
 const RECOMMENDED_PROMPTS = [
@@ -46,12 +47,21 @@ export default function ServerBuilder() {
   const [dbConnectionString, setDbConnectionString] = useState('');
   const [generatedApi, setGeneratedApi] = useState<{
     url: string;
-    fetchImplementations: { [route: string]: string };
+    fetchImplementations: Record<
+      string,
+      {
+        fetchImplementationFunction: string;
+        fetchImplementationUsage: string;
+      }
+    >;
     workerCode: string;
     rejection: string;
   } | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>({ section: 'fetch' });
-  const [apiResponse, setApiResponse] = useState<unknown>(null);
+  const [apiResponse, setApiResponse] = useState<{
+    message: string;
+    status: number;
+  } | null>(null);
   const isInputValid =
     promptInput.trim().length >= 10 && dbConnectionString.trim().length > 0;
 
@@ -96,10 +106,19 @@ export default function ServerBuilder() {
           connectionString: dbConnectionString,
         }),
       });
-      const data = await response.json();
-      console.log(data);
-      const { url, fetchImplementations, workerCode, rejection } = data.result;
-      setGeneratedApi({ url, fetchImplementations, workerCode, rejection });
+      const data = (await response.json()) as PromptToApiResponse;
+      if ('error' in data.result) {
+        setApiResponse({ message: data.result.error, status: 500 });
+        return;
+      }
+
+      if ('rejection' in data.result) {
+        setApiResponse({ message: data.result.rejection, status: 500 });
+        return;
+      }
+
+      const { url, fetchImplementations, workerCode } = data.result;
+      setGeneratedApi({ url, fetchImplementations, workerCode, rejection: '' });
     } catch (error) {
       console.error('Failed to generate app:', error);
     } finally {
@@ -111,21 +130,29 @@ export default function ServerBuilder() {
     setPromptInput(prompt);
   };
 
-  const handleRunApi = async (implementation: string) => {
+  const handleRunApi = async ({
+    implementation,
+    usageExample,
+  }: {
+    implementation: string;
+    usageExample: string;
+  }) => {
     try {
-      const usageExample = implementation.match(
-        /try {\s*([\s\S]*?)\s*} catch/
-      )?.[1];
       const response = await eval(`
         (async () => {
           ${implementation}
           ${usageExample}
         })()
       `);
-      setApiResponse(response);
-    } catch (error) {
-      console.error('Error running API:', error);
-      setApiResponse({ error: 'Failed to run API' });
+
+      if ('error' in response) {
+        setApiResponse({ message: response, status: response.status });
+        return;
+      } else {
+        setApiResponse({ message: response, status: 200 });
+      }
+    } catch {
+      setApiResponse({ message: 'Error running API', status: 500 });
     }
   };
 
@@ -397,11 +424,16 @@ export default function ServerBuilder() {
                             <button
                               onClick={() =>
                                 activeRoute &&
-                                handleRunApi(
-                                  generatedApi?.fetchImplementations[
-                                    activeRoute
-                                  ]
-                                )
+                                handleRunApi({
+                                  implementation:
+                                    generatedApi?.fetchImplementations[
+                                      activeRoute
+                                    ].fetchImplementationFunction,
+                                  usageExample:
+                                    generatedApi?.fetchImplementations[
+                                      activeRoute
+                                    ].fetchImplementationUsage,
+                                })
                               }
                               className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-purple-500 hover:bg-purple-600 rounded-md transition-colors"
                             >
@@ -410,7 +442,13 @@ export default function ServerBuilder() {
                           </div>
                           <pre className="text-xs leading-relaxed overflow-x-auto p-3 bg-[#F0F0F0] dark:bg-[#1A1A1A] rounded-md">
                             {activeRoute &&
-                              generatedApi?.fetchImplementations[activeRoute]}
+                              generatedApi?.fetchImplementations[activeRoute]
+                                .fetchImplementationFunction}
+
+                            {`\n\n`}
+                            {activeRoute &&
+                              generatedApi?.fetchImplementations[activeRoute]
+                                .fetchImplementationUsage}
                           </pre>
 
                           {Boolean(apiResponse) && (
@@ -420,11 +458,11 @@ export default function ServerBuilder() {
                                   Response
                                 </h3>
                                 <span className="px-1.5 py-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded-full">
-                                  200 OK
+                                  {apiResponse?.status}
                                 </span>
                               </div>
                               <pre className="text-xs leading-relaxed overflow-x-auto p-3 bg-[#F0F0F0] dark:bg-[#1A1A1A] rounded-md">
-                                {JSON.stringify(apiResponse, null, 2)}
+                                {JSON.stringify(apiResponse?.message, null, 2)}
                               </pre>
                             </div>
                           )}
